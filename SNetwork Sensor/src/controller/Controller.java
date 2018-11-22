@@ -20,6 +20,7 @@ public class Controller {
 		this.sensor = new Sensor(code, dataType);
 		this.ip = InetAddress.getByName(ip);
 		this.port = port;
+		this.createServerConfigFile(new File("node.properties"));
 	}
 	
 	public int getPort() {
@@ -68,8 +69,6 @@ public class Controller {
 	 * @throws IOException Signals that an I/O exception of some sort has occurred.
 	 */
 	private void createServerConfigFile(File file) throws IOException {		
-		ip = InetAddress.getByName("localhost");
-		
 		file.createNewFile();
 		
 		FileWriter fw = new FileWriter(file.getAbsoluteFile());
@@ -95,7 +94,7 @@ public class Controller {
             br.readLine();
             
             String codeLine = br.readLine().replaceAll(" ", "");
-            String code = codeLine.replace("fab-code:", "");
+            String code = codeLine.replace("fab-code:", "").substring(0, 3);
             
             String dataTypeLine = br.readLine().replaceAll(" ", "");
             int dataType = Integer.parseInt(dataTypeLine.replace("data-type:", ""));

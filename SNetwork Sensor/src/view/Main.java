@@ -27,7 +27,7 @@ public class Main {
 			
 			System.out.println("## You are able to create a sensor node.");
 			System.out.print("## Insert a code to identify the sensor (max 3 chars): ");
-			code = scan.nextLine();
+			code = scan.nextLine().substring(0, 3);
 			
 			do {
 				System.out.println("## Select a data type:");
