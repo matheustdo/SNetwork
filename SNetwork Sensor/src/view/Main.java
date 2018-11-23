@@ -16,6 +16,7 @@ public class Main {
 		//Scanner to read input.
 		Scanner scan = new Scanner(System.in); 
 		
+		System.out.println("##-#");
 		System.out.println("## Welcome to SNetwork!");
 		
 		if(!controller.hasPropertiesFile()) {
@@ -52,9 +53,16 @@ public class Main {
 			
 			controller.start(code, dataType, ip, port);
 			
+			System.out.println("## The module was created!");
+			
 			scan.close();
 		} else {
-			controller.readServerConfigFile();
+			controller.start();
 		}
+		
+		System.out.println("##-#");
+		System.out.println("## Adress: " + controller.getIp() + ":" + controller.getPort());
+		System.out.println("## Code: " + controller.getCode());
+		System.out.println("## Power: " + controller.getPowerLevel());
 	}
 }
