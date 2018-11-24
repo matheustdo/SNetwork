@@ -21,28 +21,10 @@ public class Main {
 		
 		if(!controller.hasPropertiesFile()) {
 			//Atributes for node.
-			String code;
 			String ip;
-			int dataType;
 			int port;
 			
-			System.out.println("## You are able to create a sensor node.");
-			System.out.print("## Insert a code to identify the sensor (max 3 chars): ");
-			code = scan.nextLine().substring(0, 3);
-			
-			do {
-				System.out.println("## Select a data type:");
-				System.out.println(" # 0. Temperature.");
-				System.out.print("## Select an option: ");
-				x = scan.nextLine().charAt(0);
-			} while(x != '0');
-			
-			
-			if(x == '0') {
-				dataType = DataType.TEMPERATURE;
-			} else {
-				dataType = DataType.TEMPERATURE;
-			}
+			System.out.println("## You are able to create a central node.");
 			
 			System.out.print("## Insert a ip address to the node: ");
 			ip = scan.nextLine();
@@ -51,9 +33,9 @@ public class Main {
 			port = scan.nextInt();
 			scan.nextLine();
 			
-			controller.start(code, dataType, ip, port);
+			controller.start(ip, port);
 			
-			System.out.println("## The module was created!");
+			System.out.println("## The central was created!");
 			
 			scan.close();
 		} else {
@@ -62,8 +44,6 @@ public class Main {
 		
 		System.out.println("##-#");
 		System.out.println("## Adress: " + controller.getIp() + ":" + controller.getPort());
-		System.out.println("## Code: " + controller.getCode());
-		System.out.println("## Power: " + controller.getPowerLevel());
 		
 		System.exit(0);
 	}

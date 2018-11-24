@@ -19,7 +19,7 @@ import java.util.Observer;
 import java.util.StringTokenizer;
 
 import model.Neighbor;
-import model.Sensor;
+import model.Central;
 import util.UDPServer;
 
 /**
@@ -27,7 +27,7 @@ import util.UDPServer;
  */
 public class Controller implements Observer {
 	private ArrayList<Neighbor> neighbors;
-	private Sensor sensor;
+	private Central central;
 	private UDPServer server;
 	
 	public Controller() {
@@ -40,34 +40,26 @@ public class Controller implements Observer {
 		this.startServer();
 	}
 	
-	public void start(String code, int dataType, String ip, int port) throws IOException {
-		this.sensor = new Sensor(code, dataType, port, InetAddress.getByName(ip));
-		this.createServerConfigFile(new File("node.properties"));
+	public void start( String ip, int port) throws IOException {
+		this.central = new Central(port, InetAddress.getByName(ip));
+		this.createServerConfigFile(new File("central.properties"));
 		this.readNeighborsFile();
 		this.startServer();
 	}
 	
 	public void startServer() throws UnknownHostException, SocketException {
-		server = new UDPServer(sensor.getPort(), sensor.getIp());
+		server = new UDPServer(central.getPort(), central.getIp());
 		Thread threadServer =  new Thread(server);
 		threadServer.start();
 		server.addObserver(this);
 	}
 	
 	public int getPort() {
-		return sensor.getPort();
+		return central.getPort();
 	}
 	
 	public String getIp() {
-		return sensor.getIp().getHostAddress();
-	}
-	
-	public int getPowerLevel() {
-		return sensor.getPower();
-	}
-	
-	public String getCode() {
-		return sensor.getCode();
+		return central.getIp().getHostAddress();
 	}
 	
 	/**
@@ -95,7 +87,7 @@ public class Controller implements Observer {
 	 * @return If the properties file exists.
 	 */
 	public boolean hasPropertiesFile() {
-		return (new File("node.properties")).exists();
+		return (new File("central.properties")).exists();
 	}
 	
 	/**
@@ -108,9 +100,8 @@ public class Controller implements Observer {
 		
 		FileWriter fw = new FileWriter(file.getAbsoluteFile());
         PrintWriter pw = new PrintWriter(fw);
-        pw.printf("#Sensor node properties%n" + "fab-code: " + sensor.getCode() + "%ndata-type: " +
-        		 sensor.getDataType() + "%nip-address: " + sensor.getIp().getHostAddress() + "%nport-number: " +
-        		 Integer.toString(sensor.getPort()));
+        pw.printf("#Sensor node properties%nip-address: " + central.getIp().getHostAddress() + "%nport-number: " +
+        		 Integer.toString(central.getPort()));
         fw.close();
 	}
 	
@@ -119,7 +110,7 @@ public class Controller implements Observer {
 	 * @throws IOException Signals that an I/O exception of some sort has occurred.
 	 */
 	public void readServerConfigFile() throws IOException {
-		File file = new File("node.properties");
+		File file = new File("central.properties");
 		
 		if(!file.exists()) {
 			createServerConfigFile(file);
@@ -127,20 +118,13 @@ public class Controller implements Observer {
 			FileReader fr = new FileReader(file);
             BufferedReader br = new BufferedReader(fr);  
             br.readLine();
-            
-            String codeLine = br.readLine().replaceAll(" ", "");
-            String code = codeLine.replace("fab-code:", "").substring(0, 3);
-            
-            String dataTypeLine = br.readLine().replaceAll(" ", "");
-            int dataType = Integer.parseInt(dataTypeLine.replace("data-type:", ""));
-            
             String ipLine = br.readLine().replaceAll(" ", "");
             InetAddress ip = InetAddress.getByName(ipLine.replace("ip-address:", ""));
             
             String portLine = br.readLine().replaceAll(" ", "");            
             int port = Integer.parseInt(portLine.replace("port-number:", ""));
             
-            this.sensor = new Sensor(code, dataType, port, ip);
+            this.central = new Central(port, ip);
             
             br.close();
             fr.close();
@@ -152,7 +136,7 @@ public class Controller implements Observer {
 	 * @throws IOException Signals that an I/O exception of some sort has occurred.
 	 */
 	public void readNeighborsFile() throws IOException {
-		File file = new File("node.neighbors");
+		File file = new File("central.neighbors");
 		
 		if(file.exists()) {
 			FileReader fr = new FileReader(file);
