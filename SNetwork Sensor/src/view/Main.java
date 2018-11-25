@@ -16,7 +16,7 @@ public class Main {
 		//Scanner to read input.
 		Scanner scan = new Scanner(System.in); 
 		
-		System.out.println("##-#");
+		System.out.println("####");
 		System.out.println("## Welcome to SNetwork!");
 		
 		if(!controller.hasPropertiesFile()) {
@@ -60,10 +60,14 @@ public class Main {
 			controller.start();
 		}
 		
-		System.out.println("##-#");
+		System.out.println("#### Sensor node");
 		System.out.println("## Adress: " + controller.getIp() + ":" + controller.getPort());
 		System.out.println("## Code: " + controller.getCode());
 		System.out.println("## Power: " + controller.getPowerLevel());
+		
+		do {
+			x = scan.nextLine().charAt(0);
+		} while(x != 'q' || x == 'Q');
 		
 		System.exit(0);
 	}

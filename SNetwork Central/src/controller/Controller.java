@@ -1,10 +1,12 @@
 package controller;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -17,9 +19,12 @@ import java.util.Map;
 import java.util.Observable;
 import java.util.Observer;
 import java.util.StringTokenizer;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import model.Neighbor;
 import model.Central;
+import util.Protocol;
 import util.UDPServer;
 
 /**
@@ -38,8 +43,34 @@ public class Controller implements Observer {
 		this.readServerConfigFile();
 		this.readNeighborsFile();
 		this.startServer();
+		this.startNetworkUpdater();
 	}
 	
+	private void startNetworkUpdater() throws IOException {
+		Timer timer = new Timer();
+		
+		timer.scheduleAtFixedRate(new TimerTask() {
+            public void run() {
+            	try {
+					sendUdpMessage(Protocol.HI + "#0#", "127.0.0.1", 4001);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+            }
+        }, 5000, 60000);
+		/**
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				while(true) {
+					if() {
+						
+					}
+				}
+			}
+		}).start();*/		
+	}
+
 	public void start( String ip, int port) throws IOException {
 		this.central = new Central(port, InetAddress.getByName(ip));
 		this.createServerConfigFile(new File("central.properties"));
@@ -69,16 +100,21 @@ public class Controller implements Observer {
 	 * @param port Destination port.
 	 * @throws IOException Signals that an I/O exception of some sort has occurred.
 	 */
-	private void sendUdpMessage(byte[] data, String ip, int port) throws IOException {
+	private void sendUdpMessage(String message, String ip, int port) throws IOException {
+		//Convert string do a byte array.
 		DatagramSocket socket = new DatagramSocket();
-		DatagramPacket datagramPacket;
-		
-        //Send output object
-        byte[] objData = data;
-    	datagramPacket = new DatagramPacket(objData, objData.length, InetAddress.getByName(ip), port);
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(baos);
+		DatagramPacket datagramPacket;		
+		oos.writeObject(message);
+        oos.close();
+        byte[] data = baos.toByteArray();
+        
+        //Send output object.     
+    	datagramPacket = new DatagramPacket(data, data.length, InetAddress.getByName(ip), port);
         socket.send(datagramPacket);
         
-        //Close socket
+        //Close socket.
         socket.close();
 	}
 
@@ -160,7 +196,8 @@ public class Controller implements Observer {
 
 	@Override
 	public void update(Observable o, Object arg) {
-		// TODO Auto-generated method stub
-		
+		if(o instanceof UDPServer) {
+			System.out.println(">> " + arg);
+		}
 	}	
 }

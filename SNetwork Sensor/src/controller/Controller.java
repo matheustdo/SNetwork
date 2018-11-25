@@ -176,7 +176,8 @@ public class Controller implements Observer {
 
 	@Override
 	public void update(Observable o, Object arg) {
-		// TODO Auto-generated method stub
-		
+		if(o instanceof UDPServer) {
+			System.out.println(">> " + arg);
+		}
 	}	
 }
