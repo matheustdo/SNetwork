@@ -6,5 +6,8 @@ package util;
  *
  */
 public final class DataType {
-	public static final byte TEMPERATURE = 0;
+	/**
+	 * Temperature code
+	 */
+	public static final int TEMPERATURE = 0;
 }

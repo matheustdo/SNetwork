@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.Scanner;
 
 import controller.Controller;
-import util.DataType;
 
 public class Main {
 	private static Controller controller = new Controller();
@@ -47,8 +46,8 @@ public class Main {
 		
 		do {
 			x = scan.nextLine().charAt(0);
-		} while(x != 'q' || x == 'Q');
+		} while(x != 'q' && x != 'Q');
 		
-		System.exit(0);
+		controller.die();
 	}
 }

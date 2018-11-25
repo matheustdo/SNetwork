@@ -2,6 +2,8 @@ package view;
 
 import java.io.IOException;
 import java.util.Scanner;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import controller.Controller;
 import util.DataType;
@@ -61,14 +63,29 @@ public class Main {
 		}
 		
 		System.out.println("#### Sensor node");
-		System.out.println("## Adress: " + controller.getIp() + ":" + controller.getPort());
-		System.out.println("## Code: " + controller.getCode());
-		System.out.println("## Power: " + controller.getPowerLevel());
+		startInfoUpdater();
 		
 		do {
 			x = scan.nextLine().charAt(0);
-		} while(x != 'q' || x == 'Q');
+		} while(x != 'q' && x != 'Q');
 		
-		System.exit(0);
+		controller.die();
+	}
+	
+	private static void startInfoUpdater() throws IOException {
+		Timer timer = new Timer();
+
+		timer.scheduleAtFixedRate(new TimerTask() {
+            public void run() {
+            	int power = controller.getPowerLevel();
+            	
+            	if(power < 0) {
+            		power = 0;
+            	}  
+            	System.out.println("## Adress: " + controller.getIp() + ":" + controller.getPort() + 
+						   		   " ## Code: " + controller.getCode() + " ## Power: " + power +
+						   		   "%" + " ## Jumps: " + controller.getJumps());
+            }
+        }, 0, 10000);
 	}
 }

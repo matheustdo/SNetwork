@@ -14,16 +14,14 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Observable;
 import java.util.Observer;
 import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import model.Neighbor;
 import model.Central;
+import model.Neighbor;
 import util.Protocol;
 import util.UDPServer;
 
@@ -35,49 +33,43 @@ public class Controller implements Observer {
 	private Central central;
 	private UDPServer server;
 	
+	/**
+	 * Construct a controller.
+	 */
 	public Controller() {
 		this.neighbors = new ArrayList<Neighbor>();
 	}
 	
+	/**
+	 * Start from file.
+	 * @throws IOException Signals that an I/O exception of some sort has occurred.
+	 */
 	public void start() throws IOException {
 		this.readServerConfigFile();
 		this.readNeighborsFile();
 		this.startServer();
 		this.startNetworkUpdater();
 	}
-	
-	private void startNetworkUpdater() throws IOException {
-		Timer timer = new Timer();
-		
-		timer.scheduleAtFixedRate(new TimerTask() {
-            public void run() {
-            	try {
-					sendUdpMessage(Protocol.HI + "#0#", "127.0.0.1", 4001);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-            }
-        }, 5000, 60000);
-		/**
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				while(true) {
-					if() {
-						
-					}
-				}
-			}
-		}).start();*/		
-	}
 
-	public void start( String ip, int port) throws IOException {
+	/**
+	 * Start manually.
+	 * @param ip Ip address.
+	 * @param port port number.
+	 * @throws IOException Signals that an I/O exception of some sort has occurred.
+	 */
+	public void start(String ip, int port) throws IOException {
 		this.central = new Central(port, InetAddress.getByName(ip));
 		this.createServerConfigFile(new File("central.properties"));
 		this.readNeighborsFile();
 		this.startServer();
+		this.startNetworkUpdater();
 	}
 	
+	/**
+	 * Start udp server.
+	 * @throws UnknownHostException Thrown to indicate that the IP address of a host could not be determined.
+	 * @throws SocketException Thrown to indicate that there is an error creating or accessing a Socket.
+	 */
 	public void startServer() throws UnknownHostException, SocketException {
 		server = new UDPServer(central.getPort(), central.getIp());
 		Thread threadServer =  new Thread(server);
@@ -85,10 +77,39 @@ public class Controller implements Observer {
 		server.addObserver(this);
 	}
 	
+	/**
+	 * Start network updater.
+	 * @throws IOException Signals that an I/O exception of some sort has occurred.
+	 */
+	private void startNetworkUpdater() throws IOException {
+		Timer timer = new Timer();
+		
+		timer.scheduleAtFixedRate(new TimerTask() {
+            public void run() {
+            	String message = Protocol.HI + "#0#100#" + central.getIp().getHostAddress() + "#" + central.getPort();
+            	try {
+            		for(Neighbor neighbor: neighbors) {
+            			sendUdpMessage(message, neighbor.getIp(), neighbor.getPort());
+            		}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+            }
+        }, 5000, 60000);
+	}
+	
+	/**
+	 * Get port number.
+	 * @return Port number.
+	 */
 	public int getPort() {
 		return central.getPort();
 	}
 	
+	/**
+	 * Get ip address.
+	 * @return Ip address.
+	 */
 	public String getIp() {
 		return central.getIp().getHostAddress();
 	}
@@ -100,7 +121,7 @@ public class Controller implements Observer {
 	 * @param port Destination port.
 	 * @throws IOException Signals that an I/O exception of some sort has occurred.
 	 */
-	private void sendUdpMessage(String message, String ip, int port) throws IOException {
+	private void sendUdpMessage(String message, InetAddress ip, int port) throws IOException {
 		//Convert string do a byte array.
 		DatagramSocket socket = new DatagramSocket();
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -111,7 +132,7 @@ public class Controller implements Observer {
         byte[] data = baos.toByteArray();
         
         //Send output object.     
-    	datagramPacket = new DatagramPacket(data, data.length, InetAddress.getByName(ip), port);
+    	datagramPacket = new DatagramPacket(data, data.length, ip, port);
         socket.send(datagramPacket);
         
         //Close socket.
@@ -142,7 +163,7 @@ public class Controller implements Observer {
 	}
 	
 	/**
-	 * Reads the config server file.
+	 * Read the config server file.
 	 * @throws IOException Signals that an I/O exception of some sort has occurred.
 	 */
 	public void readServerConfigFile() throws IOException {
@@ -168,7 +189,7 @@ public class Controller implements Observer {
 	}	
 	
 	/**
-	 * Reads the neighbors file.
+	 * Read the neighbors file.
 	 * @throws IOException Signals that an I/O exception of some sort has occurred.
 	 */
 	public void readNeighborsFile() throws IOException {
@@ -194,10 +215,25 @@ public class Controller implements Observer {
 		}
 	}
 
+	/**
+	 * Notification for observer.
+	 */
 	@Override
 	public void update(Observable o, Object arg) {
 		if(o instanceof UDPServer) {
 			System.out.println(">> " + arg);
 		}
-	}	
+	}
+
+	/**
+	 * Close the application.
+	 * @throws IOException Signals that an I/O exception of some sort has occurred.
+	 */
+	public void die() throws IOException {		
+		for(Neighbor neighbor: neighbors) {
+			sendUdpMessage(Protocol.BYE + "#" + central.getIp().getHostAddress() + "#" + 
+						   central.getPort(), neighbor.getIp(), neighbor.getPort());			
+		}
+		System.exit(0);
+	}
 }
