@@ -1,6 +1,7 @@
 package controller;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
@@ -32,12 +33,16 @@ public class Controller implements Observer {
 	private ArrayList<Neighbor> neighbors;
 	private Central central;
 	private UDPServer server;
+	private int updateTime;
+	private long updateCode;
 	
 	/**
 	 * Construct a controller.
 	 */
 	public Controller() {
 		this.neighbors = new ArrayList<Neighbor>();
+		this.updateTime = 60000;
+		this.updateCode = 0;
 	}
 	
 	/**
@@ -86,7 +91,7 @@ public class Controller implements Observer {
 		
 		timer.scheduleAtFixedRate(new TimerTask() {
             public void run() {
-            	String message = Protocol.HI + "#0#100#" + central.getIp().getHostAddress() + "#" + central.getPort();
+            	String message = Protocol.UPDATE +"#" + updateCode++ + "#0#100#" + central.getIp().getHostAddress() + "#" + central.getPort();
             	try {
             		for(Neighbor neighbor: neighbors) {
             			sendUdpMessage(message, neighbor.getIp(), neighbor.getPort());
@@ -95,7 +100,7 @@ public class Controller implements Observer {
 					e.printStackTrace();
 				}
             }
-        }, 5000, 60000);
+        }, 5000, updateTime);
 	}
 	
 	/**
@@ -158,7 +163,7 @@ public class Controller implements Observer {
 		FileWriter fw = new FileWriter(file.getAbsoluteFile());
         PrintWriter pw = new PrintWriter(fw);
         pw.printf("#Sensor node properties%nip-address: " + central.getIp().getHostAddress() + "%nport-number: " +
-        		 Integer.toString(central.getPort()));
+        		 Integer.toString(central.getPort()) + "%nupdate-time: " + updateTime);
         fw.close();
 	}
 	
@@ -180,6 +185,9 @@ public class Controller implements Observer {
             
             String portLine = br.readLine().replaceAll(" ", "");            
             int port = Integer.parseInt(portLine.replace("port-number:", ""));
+            
+            String updateLine = br.readLine().replaceAll(" ", "");            
+            updateTime = Integer.parseInt(updateLine.replace("update-time:", ""));
             
             this.central = new Central(port, ip);
             
@@ -214,6 +222,26 @@ public class Controller implements Observer {
             fr.close();
 		}
 	}
+	
+	/**
+	 * Add neighbor to neighbors file.
+	 * @param ip Neighbor ip.
+	 * @param port Neighbor port number.
+	 * @throws IOException Signals that an I/O exception of some sort has occurred.
+	 */
+	private void addNeighbor(InetAddress ip, int port) throws IOException {
+		File file = new File("central.neighbors");
+		
+		if(file.exists()) {
+			FileWriter fw = new FileWriter(file.getAbsoluteFile(), true);
+			BufferedWriter bw = new BufferedWriter(fw);
+			
+			bw.newLine();
+			bw.write(ip.getHostAddress() + " " + port);
+			bw.close();
+			fw.close();
+		}
+	}
 
 	/**
 	 * Notification for observer.
@@ -221,7 +249,31 @@ public class Controller implements Observer {
 	@Override
 	public void update(Observable o, Object arg) {
 		if(o instanceof UDPServer) {
+			StringTokenizer st = new StringTokenizer((String) arg, "#");
+			int protocol = Integer.parseInt(st.nextToken());	
+			
 			System.out.println(">> " + arg);
+			
+			if (protocol == Protocol.HI) {
+				try {
+					InetAddress ip = InetAddress.getByName(st.nextToken());
+					int port = Integer.parseInt(st.nextToken());
+					boolean hasNeighbor = false;
+					
+					for(Neighbor neighbor: neighbors) {
+						if(neighbor.getIp().equals(ip) && neighbor.getPort() == port) {
+							hasNeighbor = true;
+						}
+					}
+					
+					if(!hasNeighbor) {		            	
+		            	neighbors.add(new Neighbor(port, ip));
+		            	addNeighbor(ip, port);
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
 		}
 	}
 

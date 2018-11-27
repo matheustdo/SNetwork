@@ -15,6 +15,18 @@ public class Neighbor {
 	 * Construct a neighbor
 	 * @param port port number.
 	 * @param ip Ip address.
+	 */ 
+	public Neighbor(int port, InetAddress ip) {
+		this.port = port;
+		this.ip = ip;
+		this.jumps = -1;
+		this.power = -1;
+	}
+	
+	/**
+	 * Construct a neighbor
+	 * @param port port number.
+	 * @param ip Ip address.
 	 * @param jumps Jumps number.
 	 * @param power Power level.
 	 */

@@ -1,6 +1,7 @@
 package controller;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
@@ -14,7 +15,7 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Calendar;
+import java.util.HashSet;
 import java.util.Observable;
 import java.util.Observer;
 import java.util.StringTokenizer;
@@ -34,16 +35,19 @@ public class Controller implements Observer {
 	private Sensor sensor;
 	private UDPServer server;
 	private Neighbor clusterHead;
-	private final int criticalLevel = 20;
-	private final int minimalUpdateTime = 5000;
+	private int criticalLevel;
 	private String dataFusion;
-	private Calendar lastUpdate = Calendar.getInstance();
+	private HashSet<Long> updateCodes;
+	private int dataSendTime;
 	
 	/**
 	 * Construct a controller.
 	 */
 	public Controller() {
 		this.neighbors = new ArrayList<Neighbor>();
+		this.updateCodes = new HashSet<Long>();
+		this.criticalLevel = 20;
+		this.dataSendTime = 5000;
 	}
 	
 	/**
@@ -56,8 +60,9 @@ public class Controller implements Observer {
 		this.live();
 		this.startServer();
 		this.startDataSender();
-	}
-	
+		this.sendHi();
+	}	
+
 	/**
 	 * Start manually.
 	 * @param code Code.
@@ -73,6 +78,7 @@ public class Controller implements Observer {
 		this.live();
 		this.startServer();
 		this.startDataSender();
+		this.sendHi();
 	}
 	
 	/**
@@ -85,6 +91,17 @@ public class Controller implements Observer {
 		Thread threadServer =  new Thread(server);
 		threadServer.start();
 		server.addObserver(this);
+	}
+	
+	/**
+	 * Send a message to neighbors that informs the sensor existence.
+	 * @throws IOException
+	 */
+	private void sendHi() throws IOException {
+		for(Neighbor neighbor: neighbors) {
+			sendUdpMessage(Protocol.HI + "#" + sensor.getIp().getHostAddress() + "#" + sensor.getPort(), 
+						   neighbor.getIp(), neighbor.getPort());
+		}
 	}
 	
 	/**
@@ -165,7 +182,8 @@ public class Controller implements Observer {
         PrintWriter pw = new PrintWriter(fw);
         pw.printf("#Sensor node properties%n" + "fab-code: " + sensor.getCode() + "%ndata-type: " +
         		 sensor.getDataType() + "%nip-address: " + sensor.getIp().getHostAddress() + "%nport-number: " +
-        		 Integer.toString(sensor.getPort()));
+        		 Integer.toString(sensor.getPort()) + "%ncritical-level: " + criticalLevel + "%ndata-send-time: " +
+        		 dataSendTime);
         fw.close();
 	}
 	
@@ -195,6 +213,12 @@ public class Controller implements Observer {
             String portLine = br.readLine().replaceAll(" ", "");            
             int port = Integer.parseInt(portLine.replace("port-number:", ""));
             
+            String criticalLevelLine = br.readLine().replaceAll(" ", "");            
+            criticalLevel = Integer.parseInt(criticalLevelLine.replace("critical-level:", ""));
+            
+            String dataSendTimeLine = br.readLine().replaceAll(" ", "");            
+            dataSendTime = Integer.parseInt(dataSendTimeLine.replace("data-send-time:", ""));
+            
             this.sensor = new Sensor(code, dataType, port, ip);
             
             br.close();
@@ -219,9 +243,7 @@ public class Controller implements Observer {
             	InetAddress ip = InetAddress.getByName(st.nextToken());
             	int port = Integer.parseInt(st.nextToken());
             	
-            	Neighbor neighbor = new Neighbor(port, ip, -1, -1);
-            	
-            	neighbors.add(neighbor);
+            	neighbors.add(new Neighbor(port, ip));
             }
             
             br.close();
@@ -229,6 +251,30 @@ public class Controller implements Observer {
 		}
 	}
 	
+	/**
+	 * Add neighbor to neighbors file.
+	 * @param ip Neighbor ip.
+	 * @param port Neighbor port number.
+	 * @throws IOException Signals that an I/O exception of some sort has occurred.
+	 */
+	private void addNeighbor(InetAddress ip, int port) throws IOException {
+		File file = new File("node.neighbors");
+		
+		if(file.exists()) {
+			FileWriter fw = new FileWriter(file.getAbsoluteFile(), true);
+			BufferedWriter bw = new BufferedWriter(fw);
+			
+			bw.newLine();
+			bw.write(ip.getHostAddress() + " " + port);
+			bw.close();
+			fw.close();
+		}
+	}
+	
+	/**
+	 * Send data every time.
+	 * @throws IOException Signals that an I/O exception of some sort has occurred.
+	 */
 	private void startDataSender() throws IOException {
 		Timer timer = new Timer();
 		dataFusion = Protocol.DATA + "#" + sensor.getCode() + "#" + sensor.getDataType() + "#" + sensor.getData();
@@ -244,7 +290,7 @@ public class Controller implements Observer {
 	        		dataFusion = Protocol.DATA + "#" + sensor.getCode() + "#" + sensor.getDataType() + "#" + sensor.getData();
             	}
             }
-        }, 5000, 5000);
+        }, 5000, dataSendTime);
 	}
 
 	/**
@@ -259,33 +305,37 @@ public class Controller implements Observer {
 			
 			System.out.println(">> " + arg);
 			
-			if(protocol == Protocol.HI) {
+			if(protocol == Protocol.UPDATE) {
 				try {
+					long updateCode = Long.parseLong(st.nextToken());
 					int jumps = Integer.parseInt(st.nextToken());
 					int power = Integer.parseInt(st.nextToken());
 					InetAddress ip = InetAddress.getByName(st.nextToken());
 					int port = Integer.parseInt(st.nextToken());
 					
-					if(jumps != -1) {
-						if(jumps == 0 || clusterHead == null) {
-							clusterHead = new Neighbor(port, ip, jumps, power);
-							sensor.setJumps(jumps + 1);
-						} else if (jumps + 1 < sensor.getJumps() || (clusterHead.getPower() <= criticalLevel && power >= criticalLevel)){
-							clusterHead = new Neighbor(port, ip, jumps, power);
-							sensor.setJumps(jumps + 1);
-						}
+					if(!updateCodes.contains(updateCode) || jumps < sensor.getJumps()) {
+						updateCodes.add(updateCode);
 						
-						if((Calendar.getInstance().getTimeInMillis() - lastUpdate.getTimeInMillis()) >= minimalUpdateTime) {
+						if(jumps != -1) {
+							if(jumps == 0 || clusterHead == null) {
+								clusterHead = new Neighbor(port, ip, jumps, power);
+								sensor.setJumps(jumps + 1);
+							} else if ((jumps < clusterHead.getJumps() || (clusterHead.getPower() <= criticalLevel && power > criticalLevel))){
+								clusterHead = new Neighbor(port, ip, jumps, power);
+								sensor.setJumps(jumps + 1);
+							} else if (clusterHead.getIp().equals(ip) && clusterHead.getPort() == port) {
+								clusterHead.setPower(power);
+								clusterHead.setJumps(jumps);
+							}
+							System.out.println("A: " + (jumps < clusterHead.getJumps() || clusterHead.getPower() <= criticalLevel));
 							for(Neighbor neighbor: neighbors) {
 								if(!neighbor.getIp().equals(clusterHead.getIp()) || neighbor.getPort() != clusterHead.getPort()) {
-									sendUdpMessage(Protocol.HI + "#" + sensor.getJumps() + 
+									sendUdpMessage(Protocol.UPDATE + "#" + updateCode + "#" + sensor.getJumps() + 
 		         						   "#" + sensor.getPower() +"#" + sensor.getIp().getHostAddress() + 
 		         						   "#" + sensor.getPort(), neighbor.getIp(), neighbor.getPort());								
 								}            			
 		            		}
-							
-							lastUpdate = Calendar.getInstance();
-						}	
+						}
 					}				
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -293,15 +343,40 @@ public class Controller implements Observer {
 			} else if (protocol == Protocol.DATA) {
 				String message = ((String) arg).replaceFirst(protocol + "", "");
 				dataFusion  += message;
-			} else if (protocol == Protocol.BYE) {
+			} else if (protocol == Protocol.HI) {
+				try {
+					InetAddress ip = InetAddress.getByName(st.nextToken());
+					int port = Integer.parseInt(st.nextToken());
+					boolean hasNeighbor = false;
+					
+					for(Neighbor neighbor: neighbors) {
+						if(neighbor.getIp().equals(ip) && neighbor.getPort() == port) {
+							hasNeighbor = true;
+						}
+					}
+					
+					if(!hasNeighbor) {		            	
+		            	neighbors.add(new Neighbor(port, ip));
+		            	addNeighbor(ip, port);
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			} else if (protocol == Protocol.BYE || protocol == Protocol.LOST) {
 				try {
 					InetAddress ip = InetAddress.getByName(st.nextToken());
 					int port = Integer.parseInt(st.nextToken());
 					
-					if(clusterHead.getIp().equals(ip) && clusterHead.getPort() == port) {
+					if(clusterHead != null && clusterHead.getIp().equals(ip) && clusterHead.getPort() == port) {
 						clusterHead = null;
+						for(Neighbor neighbor: neighbors) {
+							if(!neighbor.getIp().equals(ip) || neighbor.getPort() != port) {
+								sendUdpMessage(Protocol.LOST + "#" + sensor.getIp().getHostAddress() + "#" + 
+											   sensor.getPort(), neighbor.getIp(), neighbor.getPort());		
+							}
+						}
 					}
-				} catch (UnknownHostException e) {
+				} catch (IOException e) {
 					e.printStackTrace();
 				}			
 			}
@@ -316,7 +391,7 @@ public class Controller implements Observer {
 			@Override
 			public void run() {
 				while(true) {
-					if(sensor.getPower() <= 0) {
+					if(sensor.getPower() <= 1) {
 						try {
 							System.out.println("## Node died");
 							die();
