@@ -306,6 +306,7 @@ public class Controller implements Observer {
 			System.out.println(">> " + arg);
 			
 			if(protocol == Protocol.UPDATE) {
+				//Request to update route.
 				try {
 					long updateCode = Long.parseLong(st.nextToken());
 					int jumps = Integer.parseInt(st.nextToken());
@@ -313,9 +314,11 @@ public class Controller implements Observer {
 					InetAddress ip = InetAddress.getByName(st.nextToken());
 					int port = Integer.parseInt(st.nextToken());
 					
+					//Avoid network loop.
 					if(!updateCodes.contains(updateCode) || jumps < sensor.getJumps()) {
 						updateCodes.add(updateCode);
 						
+						//Select the cluster head.
 						if(jumps != -1) {
 							if(jumps == 0 || clusterHead == null) {
 								clusterHead = new Neighbor(port, ip, jumps, power);
@@ -327,7 +330,8 @@ public class Controller implements Observer {
 								clusterHead.setPower(power);
 								clusterHead.setJumps(jumps);
 							}
-							System.out.println("A: " + (jumps < clusterHead.getJumps() || clusterHead.getPower() <= criticalLevel));
+							
+							//Send an update message to neighbors.
 							for(Neighbor neighbor: neighbors) {
 								if(!neighbor.getIp().equals(clusterHead.getIp()) || neighbor.getPort() != clusterHead.getPort()) {
 									sendUdpMessage(Protocol.UPDATE + "#" + updateCode + "#" + sensor.getJumps() + 
@@ -341,9 +345,11 @@ public class Controller implements Observer {
 					e.printStackTrace();
 				}				
 			} else if (protocol == Protocol.DATA) {
+				//Receive data from another sensor and increases the data fusion. 
 				String message = ((String) arg).replaceFirst(protocol + "", "");
 				dataFusion  += message;
 			} else if (protocol == Protocol.HI) {
+				//Receive a start message from a new sensor at neighborhood and add it to neighbors list.
 				try {
 					InetAddress ip = InetAddress.getByName(st.nextToken());
 					int port = Integer.parseInt(st.nextToken());
@@ -363,6 +369,7 @@ public class Controller implements Observer {
 					e.printStackTrace();
 				}
 			} else if (protocol == Protocol.BYE || protocol == Protocol.LOST) {
+				//Receives a message from a neighbor that died and removes it of the cluster head function if necessary.
 				try {
 					InetAddress ip = InetAddress.getByName(st.nextToken());
 					int port = Integer.parseInt(st.nextToken());
